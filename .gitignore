@@ -1,6 +1,33 @@
+# Virtual environment
 venv/
 .venv/
+env/
+
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+
+# Environment variables
 .env
+.env.*
+
+# IDE / Editor files
 .vscode/
+.idea/
+*.suo
+*.user
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Build output
+dist/
+build/
+*.egg-info/

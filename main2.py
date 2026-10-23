@@ -218,33 +218,51 @@ class BouquetFlower:
                 self.sparkles.append(Sparkle(hx, hy, c))
 
         # -- Stem ----------------------------------------------
-        stem_w = max(1, int(3 * bl))
+        # Thicker stems that grow with bloom level
+        stem_w     = max(2, int(6 * bl))   # up to 6px thick
         stem_alpha = int(bl * 255)
 
-        # Draw stem using a temp surface for alpha
+        # Draw stem with a highlight line for a 3D vine look
         stem_surf = pygame.Surface((WIN_W, WIN_H), pygame.SRCALPHA)
         r, g, b   = self.stem_color
         pygame.draw.line(stem_surf, (r, g, b, stem_alpha),
                          (int(grip_x), int(grip_y)),
                          (int(hx),     int(hy)), stem_w)
+        # Lighter center highlight line (makes stem look round/3D)
+        if stem_w >= 3:
+            r2, g2, b2 = min(255, r+60), min(255, g+60), min(255, b+40)
+            pygame.draw.line(stem_surf, (r2, g2, b2, min(200, stem_alpha)),
+                             (int(grip_x), int(grip_y)),
+                             (int(hx),     int(hy)), max(1, stem_w - 2))
         surface.blit(stem_surf, (0, 0))
 
         # -- Leaves (appear after 40% bloom) -------------------
         if bl > 0.4:
             leaf_alpha = min(255, int((bl - 0.4) / 0.6 * 255))
-            leaf_size  = max(2, int(14 * (bl - 0.4) / 0.6))
-            # Position leaf at midpoint of stem
-            mid_x = int((grip_x + hx) / 2)
-            mid_y = int((grip_y + hy) / 2)
+            leaf_frac  = (bl - 0.4) / 0.6
+            leaf_size  = max(4, int(26 * leaf_frac))   # bigger leaves
+            # Position leaf at ~1/3 up the stem
+            mid_x = int(grip_x + (hx - grip_x) * 0.38)
+            mid_y = int(grip_y + (hy - grip_y) * 0.38)
             rad   = math.radians(self.stem_angle_deg)
             # Perpendicular direction for leaf
             perp_x = -math.cos(rad)
             perp_y = -math.sin(rad)
             for side in [-1, 1]:
-                lx = mid_x + int(side * perp_x * leaf_size * 1.2)
-                ly = mid_y + int(side * perp_y * leaf_size * 1.2)
-                draw_circle_alpha(surface, self.leaf_color,
-                                  lx, ly, leaf_size, leaf_alpha)
+                lx = mid_x + int(side * perp_x * leaf_size * 1.5)
+                ly = mid_y + int(side * perp_y * leaf_size * 1.5)
+                # Draw leaf as a slightly elongated ellipse
+                leaf_surf = pygame.Surface((leaf_size * 3, leaf_size * 2))
+                leaf_surf.fill((0, 0, 0))
+                leaf_surf.set_colorkey((0, 0, 0))
+                leaf_surf.set_alpha(leaf_alpha)
+                pygame.draw.ellipse(leaf_surf, self.leaf_color,
+                                    (0, 0, leaf_size * 3, leaf_size * 2))
+                # Rotate leaf to align with stem angle
+                rot_angle = math.degrees(math.atan2(perp_y, perp_x)) * side
+                leaf_rot  = pygame.transform.rotate(leaf_surf, -rot_angle - 90)
+                lr        = leaf_rot.get_rect(center=(lx, ly))
+                surface.blit(leaf_rot, lr)
 
         # -- Flower bud / petals -------------------------------
         if bl < 0.08:
@@ -260,35 +278,100 @@ class BouquetFlower:
             s.draw(surface)
 
     def _draw_petals(self, surface, fx, fy):
-        MAX    = 80
-        N      = 6
-        bl     = self.bloom_level
-        pw     = max(2, int(MAX * 0.36 * bl))
-        ph     = max(2, int(MAX * 0.60 * bl))
-        spread = max(1, int(MAX * 0.27 * bl))
-        if pw < 2 or ph < 2:
+        """
+        Draw a beautiful layered flower with:
+          - Outer petals  (large, wide)
+          - Inner petals  (smaller, rotated 30deg, different shade)
+          - Glow halo around the whole flower
+        """
+        bl = self.bloom_level
+        if bl < 0.08:
             return
-        for i in range(N):
-            ang_deg = (360 / N) * i + self.spin
+
+        # --- Glow halo behind everything ---
+        GLOW_R = int(85 * bl)
+        if GLOW_R > 2:
+            for gr in range(GLOW_R, GLOW_R // 2, -3):
+                ga = int(30 * (1 - gr / GLOW_R))
+                draw_circle_alpha(surface, self.color_outer, fx, fy, gr, ga)
+
+        # --- Outer petals (6 large petals) ---
+        N_OUT   = 6
+        MAX_OUT = 120        # max petal height at full bloom
+        pw_out  = max(3, int(MAX_OUT * 0.42 * bl))   # petal width
+        ph_out  = max(3, int(MAX_OUT * 0.72 * bl))   # petal height
+        sp_out  = max(2, int(MAX_OUT * 0.32 * bl))   # spread from center
+
+        for i in range(N_OUT):
+            ang_deg = (360 / N_OUT) * i + self.spin
             ang_rad = math.radians(ang_deg)
-            px = fx + math.cos(ang_rad) * spread
-            py = fy + math.sin(ang_rad) * spread
+            px = fx + math.cos(ang_rad) * sp_out
+            py = fy + math.sin(ang_rad) * sp_out
             color = self.color_outer if i % 2 == 0 else self.color_inner
-            pw2, ph2 = pw * 2, ph * 2
-            petal = pygame.Surface((pw2 + 2, ph2 + 2))
+            pw2, ph2 = pw_out * 2, ph_out * 2
+            petal = pygame.Surface((pw2 + 4, ph2 + 4))
             petal.fill((0, 0, 0))
             petal.set_colorkey((0, 0, 0))
-            petal.set_alpha(218)
-            pygame.draw.ellipse(petal, color, (1, 1, pw2, ph2))
+            petal.set_alpha(230)
+            pygame.draw.ellipse(petal, color, (2, 2, pw2, ph2))
+            # Lighter edge highlight on each petal
+            hw, hh = max(1, pw2 - 8), max(1, ph2 - 12)
+            if hw > 2 and hh > 2:
+                hc = tuple(min(255, c + 60) for c in color)
+                pygame.draw.ellipse(petal, hc, (pw2 // 2 - hw // 2 + 2,
+                                                 6, hw, hh))
+            rotated = pygame.transform.rotate(petal, -ang_deg - 90)
+            rect    = rotated.get_rect(center=(int(px), int(py)))
+            surface.blit(rotated, rect)
+
+        # --- Inner petals (5 petals, rotated 36deg offset, smaller) ---
+        N_IN   = 5
+        pw_in  = max(2, int(MAX_OUT * 0.28 * bl))
+        ph_in  = max(2, int(MAX_OUT * 0.50 * bl))
+        sp_in  = max(1, int(MAX_OUT * 0.18 * bl))
+
+        for i in range(N_IN):
+            ang_deg = (360 / N_IN) * i + self.spin + 36
+            ang_rad = math.radians(ang_deg)
+            px = fx + math.cos(ang_rad) * sp_in
+            py = fy + math.sin(ang_rad) * sp_in
+            # Inner petals use the lighter shade
+            color = self.color_inner
+            pw2, ph2 = pw_in * 2, ph_in * 2
+            petal = pygame.Surface((pw2 + 4, ph2 + 4))
+            petal.fill((0, 0, 0))
+            petal.set_colorkey((0, 0, 0))
+            petal.set_alpha(200)
+            pygame.draw.ellipse(petal, color, (2, 2, pw2, ph2))
             rotated = pygame.transform.rotate(petal, -ang_deg - 90)
             rect    = rotated.get_rect(center=(int(px), int(py)))
             surface.blit(rotated, rect)
 
     def _draw_center(self, surface, fx, fy):
-        r  = max(2, int(13 * self.bloom_level))
-        draw_circle_alpha(surface, self.center_color, fx, fy, r + 3, 80)
+        """Golden center with a bright inner highlight, like a real flower."""
+        bl = self.bloom_level
+        r  = max(3, int(20 * bl))          # big golden center
+
+        # Outer glow ring
+        draw_circle_alpha(surface, self.center_color, fx, fy, r + 8, 60)
+        draw_circle_alpha(surface, self.center_color, fx, fy, r + 4, 100)
+
+        # Main center disc
         pygame.draw.circle(surface, self.center_color, (int(fx), int(fy)), r)
-        pygame.draw.circle(surface, (255, 255, 210), (int(fx), int(fy)), max(1, r - 3))
+
+        # Bright highlight spot (like a real sunflower center)
+        pygame.draw.circle(surface, (255, 255, 220),
+                           (int(fx) - r // 4, int(fy) - r // 4),
+                           max(2, r // 3))
+
+        # Dark dots pattern in center (sunflower look)
+        if r > 8:
+            for dot_angle in range(0, 360, 60):
+                da  = math.radians(dot_angle + self.spin * 0.3)
+                ddr = int(r * 0.52)
+                dx  = int(fx + math.cos(da) * ddr)
+                dy  = int(fy + math.sin(da) * ddr)
+                pygame.draw.circle(surface, (180, 120, 10), (dx, dy), max(1, r // 5))
 
 
 # -------------------------------------------------------------
@@ -309,14 +392,15 @@ class Bouquet:
     """
 
     # (stem_angle_degrees, stem_length, theme_index)
+    # Stems are long so flowers reach high above your hand
     LAYOUT = [
-        (  0, 265, 0),   # center, tallest, straight up
-        (-14, 252, 1),   # slightly left
-        ( 14, 252, 2),   # slightly right
-        (-30, 235, 3),   # more left
-        ( 30, 235, 4),   # more right
-        (-48,  215, 5),   # far left, shorter
-        ( 48,  215, 6),   # far right, shorter
+        (  0, 340, 0),   # center, tallest, straight up
+        (-16, 315, 1),   # slightly left
+        ( 16, 315, 2),   # slightly right
+        (-34, 285, 3),   # more left
+        ( 34, 285, 4),   # more right
+        (-54, 250, 5),   # far left, shorter
+        ( 54, 250, 6),   # far right, shorter
     ]
 
     def __init__(self, cx, cy):
