@@ -1,5 +1,15 @@
 # 🌸 Bloom — Hand Gesture Flower Animation
 
+## About This Project
+
+**Project 02: Bloom — Real-Time Hand Gesture Flower Animation System**
+
+The Bloom Hand Gesture Flower Animation System is a technology-based project designed to create interactive visual art using real-time hand tracking through a standard webcam. The system detects hand positions and finger gestures using artificial intelligence and responds by generating animated flowers on screen that grow, bloom, and move in sync with the user's hand movements.
+
+By combining computer vision, gesture recognition, and real-time graphics animation, the system aims to demonstrate how technology can bridge human movement and digital art — allowing users to control a living, blooming visual experience simply by moving their hands in front of a camera, with no additional hardware or controllers required.
+
+---
+
 **Bloom** is a real-time hand gesture project that uses your webcam to detect your hand movements and displays beautiful animated flowers on screen that react to your gestures. It is built entirely in Python using MediaPipe (hand tracking), OpenCV (camera), and Pygame (graphics).
 
 There are **two modes**:
